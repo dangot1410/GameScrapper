@@ -1,6 +1,9 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import type { StoreItem } from '../types'
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core'
+import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 
 type SourceConfig = {
   id: string
@@ -15,6 +18,105 @@ type SourceConfig = {
 
 // Store items per source in memory (session only)
 const sourceItemsMap = new Map<string, StoreItem[]>()
+
+// Sortable source item component
+function SortableSourceItem({ source, isActive, isDragging, onRefresh, onDelete, onSelect }: { 
+  source: SourceConfig
+  isActive: boolean
+  isDragging: boolean
+  onRefresh: (source: SourceConfig) => void
+  onDelete: (sourceId: string) => void
+  onSelect: (sourceId: string) => void
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: source.id })
+  
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  }
+  
+  const formatSourceInfo = (source: SourceConfig) => {
+    if (source.type === 'paginated' && source.pageCount) {
+      return `(${source.pageCount} pages)`
+    }
+    return '(page unique)'
+  }
+  
+  const formatDate = (dateStr?: string) => {
+    if (!dateStr) return 'Jamais'
+    return new Date(dateStr).toLocaleDateString('fr-FR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+  }
+  
+  const sourceItemCount = sourceItemsMap.get(source.id)?.length || source.gameCount || 0
+  
+  return (
+    <div 
+      ref={setNodeRef}
+      style={style}
+      className={`flex items-center justify-between p-3 rounded-xl border ${
+        isActive ? 'bg-steam-accent/10 border-steam-accent/50' : 'bg-black/20 border-steam-border'
+      }`}
+    >
+      <div 
+        className="flex-1 cursor-pointer flex items-center gap-2"
+        onClick={() => onSelect(source.id)}
+      >
+        {/* Drag handle */}
+        <div 
+          {...attributes} 
+          {...listeners}
+          className="cursor-grab active:cursor-grabbing p-1 text-steam-muted hover:text-steam-accent"
+          title="Faire glisser pour réorganiser"
+        >
+          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+            <path d="M7 2a2 2 0 1 0 .001 4.001A2 2 0 0 0 7 2zm0 6a2 2 0 1 0 .001 4.001A2 2 0 0 0 7 8zm0 6a2 2 0 1 0 .001 4.001A2 2 0 0 0 7 14zm6-8a2 2 0 1 0-.001-4.001A2 2 0 0 0 13 6zm0 2a2 2 0 1 0 .001 4.001A2 2 0 0 0 13 8zm0 6a2 2 0 1 0 .001 4.001A2 2 0 0 0 13 14z"/>
+          </svg>
+        </div>
+        
+        <div>
+          <div className="flex items-center gap-3 flex-wrap">
+            <span className="font-medium text-white">{source.name}</span>
+            <span className="text-xs text-steam-muted">{formatSourceInfo(source)}</span>
+            <span className="text-xs text-steam-accent">{sourceItemCount} jeux</span>
+            <span className="text-xs text-steam-muted">Actualisé: {formatDate(source.lastUpdated)}</span>
+          </div>
+          <div className="text-xs text-steam-muted truncate max-w-md mt-1">{source.url}</div>
+        </div>
+      </div>
+      
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => onRefresh(source)}
+          disabled={isDragging}
+          className="p-2 rounded-lg bg-black/40 text-steam-muted hover:text-steam-accent hover:bg-black/60 transition-all"
+          title="Actualiser"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+        </button>
+        
+        <button
+          onClick={() => onDelete(source.id)}
+          disabled={isDragging}
+          className="p-2 rounded-lg bg-black/40 text-steam-muted hover:text-red-400 hover:bg-black/60 transition-all"
+          title="Supprimer"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+    </div>
+  )
+}
 
 export function StorePage() {
   const [localItems, setLocalItems] = useState<StoreItem[]>([])
@@ -37,6 +139,18 @@ export function StorePage() {
   const [progressPhase, setProgressPhase] = useState<string>('')
   const [progressCurrent, setProgressCurrent] = useState(0)
   const [progressTotal, setProgressTotal] = useState(0)
+  
+  // Drag and drop sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  )
 
   // Load sources
   useEffect(() => {
@@ -292,6 +406,28 @@ export function StorePage() {
       alert('Erreur lors du vidage du cache')
     }
   }
+  
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event
+    
+    if (over && active.id !== over.id) {
+      setSources((items) => {
+        const oldIndex = items.findIndex(item => item.id === active.id)
+        const newIndex = items.findIndex(item => item.id === over.id)
+        const newItems = arrayMove(items, oldIndex, newIndex)
+        
+        // Save the new order to settings
+        void window.launcher.settingsGet().then(settings => {
+          if (settings.sources) {
+            settings.sources = newItems
+            void window.launcher.settingsSetGamesFolder(settings.gamesFolderPath || null).then(() => {})
+          }
+        })
+        
+        return newItems
+      })
+    }
+  }
 
   // Format date
   const formatDate = (dateStr?: string) => {
@@ -479,65 +615,30 @@ export function StorePage() {
             </button>
           </div>
           
-          <div className="space-y-2">
-            {sources.map(source => {
-              const sourceItemCount = sourceItemsMap.get(source.id)?.length || source.gameCount || 0
-              return (
-                <div 
-                  key={source.id}
-                  className={`flex items-center justify-between p-3 rounded-xl border ${
-                    activeSourceId === source.id && !showAllSources
-                      ? 'bg-steam-accent/10 border-steam-accent/50' 
-                      : 'bg-black/20 border-steam-border'
-                  }`}
-                >
-                  <div 
-                    className="flex-1 cursor-pointer"
-                    onClick={() => handleSelectSource(source.id)}
-                  >
-                    <div className="flex items-center gap-3 flex-wrap">
-                      <span className="font-medium text-white">{source.name}</span>
-                      <span className="text-xs text-steam-muted">{formatSourceInfo(source)}</span>
-                      <span className="text-xs text-steam-accent">
-                        {sourceItemCount} jeux
-                      </span>
-                      <span className="text-xs text-steam-muted">
-                        Actualisé: {formatDate(source.lastUpdated)}
-                      </span>
-                    </div>
-                    <div className="text-xs text-steam-muted truncate max-w-md mt-1">
-                      {source.url}
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center gap-2">
-                    {/* Refresh button */}
-                    <button
-                      onClick={() => handleRefreshSource(source)}
-                      disabled={isScraping}
-                      className="p-2 rounded-lg bg-black/40 text-steam-muted hover:text-steam-accent hover:bg-black/60 transition-all"
-                      title="Actualiser"
-                    >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                      </svg>
-                    </button>
-                    
-                    {/* Delete button */}
-                    <button
-                      onClick={() => handleDeleteSource(source.id)}
-                      className="p-2 rounded-lg bg-black/40 text-steam-muted hover:text-red-400 hover:bg-black/60 transition-all"
-                      title="Supprimer"
-                    >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext
+              items={sources.map(s => s.id)}
+              strategy={verticalListSortingStrategy}
+            >
+              <div className="space-y-2">
+                {sources.map(source => (
+                  <SortableSourceItem
+                    key={source.id}
+                    source={source}
+                    isActive={activeSourceId === source.id && !showAllSources}
+                    isDragging={false}
+                    onRefresh={handleRefreshSource}
+                    onDelete={handleDeleteSource}
+                    onSelect={handleSelectSource}
+                  />
+                ))}
+              </div>
+            </SortableContext>
+          </DndContext>
         </div>
       )}
 
