@@ -63,7 +63,7 @@ declare global {
         genres: string[]
         screenshots: string[]
       } | null>
-      storeScrape: (pageUrl: string) => Promise<{
+      storeScrape: (pageUrl: string, sourceId?: string) => Promise<{
         pageUrl: string
         items: {
           id: string
@@ -72,7 +72,7 @@ declare global {
           coverImageUrl: string | null
         }[]
       }>
-      storeScrapePaginated: (urlTemplate: string, pageCount: number) => Promise<{
+      storeScrapePaginated: (urlTemplate: string, pageCount: number, sourceId?: string) => Promise<{
         pageUrl: string
         isPaginatedMode?: boolean
         items: {

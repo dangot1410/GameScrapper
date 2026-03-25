@@ -830,13 +830,23 @@ ipcMain.handle('steam:appDetails', async (_e, appId: number | string) => {
   }
 })
 
-ipcMain.handle('store:scrape', async (_e, pageUrl: string) => {
+ipcMain.handle('store:scrape', async (_e, pageUrl: string, sourceId?: string) => {
   try {
     sendStoreProgress({ phase: 'fetch' })
-    const previous = loadStoreDiscovery()
+    
+    // Load previous data for this source if sourceId provided
     const prevById = new Map<string, { coverImageUrl: string | null }>()
-    if (previous?.items?.length && previous.pageUrl === pageUrl) {
-      for (const it of previous.items) prevById.set(it.id, { coverImageUrl: it.coverImageUrl ?? null })
+    if (sourceId) {
+      const sourceData = loadSourceData(sourceId)
+      if (sourceData?.items?.length) {
+        for (const it of sourceData.items) prevById.set(it.id, { coverImageUrl: it.coverImageUrl ?? null })
+      }
+    } else {
+      // Fallback to old discovery file
+      const previous = loadStoreDiscovery()
+      if (previous?.items?.length && previous.pageUrl === pageUrl) {
+        for (const it of previous.items) prevById.set(it.id, { coverImageUrl: it.coverImageUrl ?? null })
+      }
     }
     const base = new URL(pageUrl)
     const res = await fetch(pageUrl, {
@@ -905,7 +915,14 @@ ipcMain.handle('store:scrape', async (_e, pageUrl: string) => {
 
     sendStoreProgress({ phase: 'save' })
     const result = { pageUrl, items }
-    saveStoreDiscovery({ ...result, updatedAt: new Date().toISOString() })
+    
+    // Save per-source if sourceId provided, otherwise fallback to old format
+    if (sourceId) {
+      saveSourceData(sourceId, items)
+    } else {
+      saveStoreDiscovery({ ...result, updatedAt: new Date().toISOString() })
+    }
+    
     return result
   } finally {
     sendStoreProgress({ phase: 'done' })
@@ -913,7 +930,7 @@ ipcMain.handle('store:scrape', async (_e, pageUrl: string) => {
 })
 
 // Paginated scraping with automatic Steam enrichment
-ipcMain.handle('store:scrapePaginated', async (_e, urlTemplate: string, pageCount: number) => {
+ipcMain.handle('store:scrapePaginated', async (_e, urlTemplate: string, pageCount: number, sourceId?: string) => {
   try {
     sendStoreProgress({ phase: 'fetch' })
     
@@ -1297,7 +1314,13 @@ ipcMain.handle('store:scrapePaginated', async (_e, urlTemplate: string, pageCoun
     const withImages = enrichedItems.filter(i => i.coverImageUrl).length
     console.log(`Scraped ${enrichedItems.length} games, ${withImages} with images`)
     
-    saveStoreDiscovery({ ...result, updatedAt: new Date().toISOString() })
+    // Save per-source if sourceId provided, otherwise fallback to old format
+    if (sourceId) {
+      saveSourceData(sourceId, enrichedItems)
+    } else {
+      saveStoreDiscovery({ ...result, updatedAt: new Date().toISOString() })
+    }
+    
     return result
   } finally {
     sendStoreProgress({ phase: 'done' })

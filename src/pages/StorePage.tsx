@@ -143,15 +143,7 @@ export function StorePage() {
 
     setIsScraping(true)
     try {
-      // Scrape the source first
-      let res
-      if (isPaginatedMode) {
-        res = await window.launcher.storeScrapePaginated(newSourceUrl, pageCount)
-      } else {
-        res = await window.launcher.storeScrape(newSourceUrl)
-      }
-      
-      // Save the new source
+      // Save the new source first to get an ID
       const newSource = await window.launcher.sourcesAdd({
         name: newSourceName,
         url: newSourceUrl,
@@ -159,9 +151,15 @@ export function StorePage() {
         pageCount: isPaginatedMode ? pageCount : undefined,
       })
       
-      // Save items for this source in backend
-      // Note: We need to modify the backend to accept sourceId
-      // For now, we store in memory
+      // Scrape with the sourceId
+      let res
+      if (isPaginatedMode) {
+        res = await window.launcher.storeScrapePaginated(newSourceUrl, pageCount, newSource.id)
+      } else {
+        res = await window.launcher.storeScrape(newSourceUrl, newSource.id)
+      }
+      
+      // Save items for this source in memory
       sourceItemsMap.set(newSource.id, res.items)
       
       // Update meta
@@ -195,9 +193,9 @@ export function StorePage() {
     try {
       let res
       if (source.type === 'paginated' && source.pageCount) {
-        res = await window.launcher.storeScrapePaginated(source.url, source.pageCount)
+        res = await window.launcher.storeScrapePaginated(source.url, source.pageCount, source.id)
       } else {
-        res = await window.launcher.storeScrape(source.url)
+        res = await window.launcher.storeScrape(source.url, source.id)
       }
       
       // Store items for this source
