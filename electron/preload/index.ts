@@ -54,6 +54,19 @@ contextBridge.exposeInMainWorld('launcher', {
   settingsSetGamesFolder: (folderPath: string | null) => ipcRenderer.invoke('settings:setGamesFolder', folderPath),
   settingsSelectGamesFolder: () => ipcRenderer.invoke('settings:selectGamesFolder'),
   
+  // Source management
+  sourcesGetAll: () => ipcRenderer.invoke('sources:getAll'),
+  sourcesAdd: (source: { name: string; url: string; type: 'single' | 'paginated'; pageCount?: number }) =>
+    ipcRenderer.invoke('sources:add', source),
+  sourcesRemove: (sourceId: string) => ipcRenderer.invoke('sources:remove', sourceId),
+  sourcesSetActive: (sourceId: string) => ipcRenderer.invoke('sources:setActive', sourceId),
+  sourcesUpdateMeta: (sourceId: string, gameCount: number) => ipcRenderer.invoke('sources:updateMeta', sourceId, gameCount),
+  sourcesClearCache: () => ipcRenderer.invoke('sources:clearCache'),
+  
+  // Store data per source
+  storeGetSourceData: (sourceId: string) => ipcRenderer.invoke('store:getSourceData', sourceId),
+  storeGetAllSourcesData: () => ipcRenderer.invoke('store:getAllSourcesData'),
+  
   // App uninstall
   appUninstall: () => ipcRenderer.invoke('app:uninstall'),
   onStoreProgress: (cb: (p: StoreProgressEvent) => void) => {

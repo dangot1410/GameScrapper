@@ -89,8 +89,21 @@ function settingsPath() {
   return path.join(app.getPath('userData'), 'settings.json')
 }
 
+type SourceConfig = {
+  id: string
+  name: string
+  url: string
+  type: 'single' | 'paginated'
+  pageCount?: number
+  createdAt: string
+  gameCount?: number
+  lastUpdated?: string
+}
+
 type SettingsFile = {
   gamesFolderPath?: string | null
+  sources?: SourceConfig[]
+  activeSourceId?: string | null
 }
 
 function loadSettings(): SettingsFile {
@@ -141,6 +154,56 @@ function saveStoreDiscovery(data: Omit<StoreDiscoveryFile, 'updatedAt'> & { upda
     updatedAt: data.updatedAt ?? new Date().toISOString(),
   }
   writeFileSync(storeDiscoveryPath(), JSON.stringify(full, null, 2), 'utf-8')
+}
+
+// New: Store data per source
+function storeSourcesPath() {
+  return path.join(app.getPath('userData'), 'store-sources-data.json')
+}
+
+type SourceData = {
+  sourceId: string
+  items: { id: string; name: string; detailPageUrl: string; coverImageUrl: string | null; steamData?: any }[]
+  updatedAt: string
+  gameCount: number
+}
+
+type StoreSourcesData = {
+  sources: Record<string, SourceData>
+}
+
+function loadStoreSourcesData(): StoreSourcesData {
+  try {
+    const raw = readFileSync(storeSourcesPath(), 'utf-8')
+    return JSON.parse(raw) as StoreSourcesData
+  } catch {
+    return { sources: {} }
+  }
+}
+
+function saveStoreSourcesData(data: StoreSourcesData) {
+  writeFileSync(storeSourcesPath(), JSON.stringify(data, null, 2), 'utf-8')
+}
+
+function saveSourceData(sourceId: string, items: { id: string; name: string; detailPageUrl: string; coverImageUrl: string | null; steamData?: any }[]) {
+  const data = loadStoreSourcesData()
+  data.sources[sourceId] = {
+    sourceId,
+    items,
+    updatedAt: new Date().toISOString(),
+    gameCount: items.length,
+  }
+  saveStoreSourcesData(data)
+}
+
+function loadSourceData(sourceId: string): SourceData | null {
+  const data = loadStoreSourcesData()
+  return data.sources[sourceId] || null
+}
+
+function getAllSourcesData(): SourceData[] {
+  const data = loadStoreSourcesData()
+  return Object.values(data.sources)
 }
 
 export type LibraryGame = {
@@ -555,6 +618,10 @@ async function resolveDirectDownloadUrl(url: string, depth = 0): Promise<string>
 ipcMain.handle('library:get', () => loadLibrary())
 
 ipcMain.handle('store:cached', () => loadStoreDiscovery())
+
+// New handlers for per-source data
+ipcMain.handle('store:getSourceData', (_e, sourceId: string) => loadSourceData(sourceId))
+ipcMain.handle('store:getAllSourcesData', () => getAllSourcesData())
 
 ipcMain.handle('store:clear', () => {
   saveStoreDiscovery({
@@ -2195,6 +2262,77 @@ ipcMain.handle('game:uninstallFiles', async (_e, gameId: string) => {
 
 // Settings handlers
 ipcMain.handle('settings:get', () => loadSettings())
+
+// Source management handlers
+ipcMain.handle('sources:getAll', () => {
+  const settings = loadSettings()
+  return settings.sources || []
+})
+
+ipcMain.handle('sources:add', async (_e, source: Omit<SourceConfig, 'id' | 'createdAt'>) => {
+  const settings = loadSettings()
+  if (!settings.sources) settings.sources = []
+  
+  const newSource: SourceConfig = {
+    ...source,
+    id: Date.now().toString(),
+    createdAt: new Date().toISOString(),
+  }
+  
+  settings.sources.push(newSource)
+  settings.activeSourceId = newSource.id
+  saveSettings(settings)
+  
+  return newSource
+})
+
+ipcMain.handle('sources:remove', async (_e, sourceId: string) => {
+  const settings = loadSettings()
+  if (!settings.sources) return false
+  
+  settings.sources = settings.sources.filter(s => s.id !== sourceId)
+  
+  // If we removed the active source, clear it
+  if (settings.activeSourceId === sourceId) {
+    settings.activeSourceId = settings.sources.length > 0 ? settings.sources[0].id : null
+  }
+  
+  saveSettings(settings)
+  return true
+})
+
+ipcMain.handle('sources:setActive', async (_e, sourceId: string) => {
+  const settings = loadSettings()
+  settings.activeSourceId = sourceId
+  saveSettings(settings)
+  return true
+})
+
+ipcMain.handle('sources:updateMeta', async (_e, sourceId: string, gameCount: number) => {
+  const settings = loadSettings()
+  if (settings.sources) {
+    const source = settings.sources.find(s => s.id === sourceId)
+    if (source) {
+      source.gameCount = gameCount
+      source.lastUpdated = new Date().toISOString()
+      saveSettings(settings)
+    }
+  }
+  return true
+})
+
+ipcMain.handle('sources:clearCache', async () => {
+  try {
+    const discoveryPath = storeDiscoveryPath()
+    if (existsSync(discoveryPath)) {
+      rmSync(discoveryPath)
+    }
+    return { success: true }
+  } catch (e) {
+    console.error('Error clearing cache:', e)
+    return { success: false, error: String(e) }
+  }
+})
 
 ipcMain.handle('settings:setGamesFolder', async (_e, folderPath: string | null) => {
   const settings = loadSettings()

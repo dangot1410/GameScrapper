@@ -114,9 +114,21 @@ declare global {
       gameInstallResume: () => Promise<boolean>
       
       // Settings
-      settingsGet: () => Promise<{ gamesFolderPath?: string | null }>
+      settingsGet: () => Promise<{ gamesFolderPath?: string | null; sources?: any[]; activeSourceId?: string | null }>
       settingsSetGamesFolder: (folderPath: string | null) => Promise<{ gamesFolderPath?: string | null }>
       settingsSelectGamesFolder: () => Promise<string | null>
+      
+      // Source management
+      sourcesGetAll: () => Promise<{ id: string; name: string; url: string; type: 'single' | 'paginated'; pageCount?: number; createdAt: string; gameCount?: number; lastUpdated?: string }[]>
+      sourcesAdd: (source: { name: string; url: string; type: 'single' | 'paginated'; pageCount?: number }) => Promise<{ id: string; name: string; url: string; type: 'single' | 'paginated'; pageCount?: number; createdAt: string; gameCount?: number; lastUpdated?: string }>
+      sourcesRemove: (sourceId: string) => Promise<boolean>
+      sourcesSetActive: (sourceId: string) => Promise<boolean>
+      sourcesUpdateMeta: (sourceId: string, gameCount: number) => Promise<boolean>
+      sourcesClearCache: () => Promise<{ success: boolean; error?: string }>
+      
+      // Store data per source
+      storeGetSourceData: (sourceId: string) => Promise<{ sourceId: string; items: any[]; updatedAt: string; gameCount: number } | null>
+      storeGetAllSourcesData: () => Promise<{ sourceId: string; items: any[]; updatedAt: string; gameCount: number }[]>
       
       // App uninstall
       appUninstall: () => Promise<{ success: boolean }>
