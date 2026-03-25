@@ -33,7 +33,7 @@ Votre page d'accueil. Lancez vos jeux d'un simple clic, suivez vos heures de jeu
 ### 2. Gestion des Sources
 C'est ici que la magie opère. Vous pouvez configurer l'outil pour qu'il aille chercher les données là où vous le souhaitez.
 
-![Interface Source](image2.jpg)
+![Interface Source](image2.png)
 
 * **Page Unique :** Idéal pour scraper une liste ou un tableau sur une page web précise.
 * **Multi-pages :** Conçu pour parcourir des catalogues entiers ou des systèmes de pagination.
