@@ -13,7 +13,7 @@ type SourceConfig = {
   lastUpdated?: string
 }
 
-// Store items per source in memory
+// Store items per source in memory (session only)
 const sourceItemsMap = new Map<string, StoreItem[]>()
 
 export function StorePage() {
