@@ -3,68 +3,63 @@
 
 ![Interface Bibliothèque](image1.png)
 
-**GameScraper** est une application de bureau moderne conçue pour centraliser, organiser et lancer vos jeux vidéo. Grâce à son moteur de scraping intégré, vous pouvez facilement importer des listes de jeux depuis vos sites web favoris, gérer vos téléchargements et garder un historique précis de votre temps de jeu.
+**GameScraper** est une application tout-en-un pour centraliser et automatiser votre collection de jeux vidéo. Scrapez, téléchargez et jouez en un clic.
 
 ---
 
 ## ✨ Fonctionnalités Principales
 
-* 📚 **Bibliothèque Unifiée :** Regroupez tous vos jeux dans une interface claire et épurée.
-* 🕸️ **Scraping Personnalisable :** Ajoutez vos propres sources web (URL) pour récupérer automatiquement les informations des jeux.
-* 🔄 **Support Multi-Formats :** Scrapez des pages uniques ou des architectures multi-pages complexes.
-* ⏱️ **Suivi du Temps de Jeu :** Enregistrez et consultez vos statistiques de jeu pour chaque titre.
-* 🌙 **Interface Dark Mode :** Un design moderne et reposant pour les yeux, pensé pour les joueurs.
-* ⚡ **Gestion du Cache :** Système de cache intégré pour des performances optimales et éviter de surcharger les sites sources.
+* 🚀 **Automatisation Totale :** L'application télécharge le jeu, **extrait l'archive (.zip)** et le lance directement. Plus besoin de manipuler les fichiers !
+* 🕸️ **Scraping Personnalisable :** Ajoutez vos propres sources (URL) pour indexer vos jeux favoris automatiquement.
+* 📚 **Bibliothèque Unifiée :** Regroupez tous vos titres dans une interface moderne et fluide.
+* ⏱️ **Suivi du Temps de Jeu :** Enregistrez vos statistiques de jeu pour chaque titre.
+* 🌙 **Interface Dark Mode :** Un design épuré pensé pour le confort des joueurs.
+* ⚡ **Gestion du Cache :** Navigation ultra-rapide sans surcharger les sites sources.
 
 ---
 
-## ⚠️ Avertissement Légal & Utilisation Responsable
+## ⚠️ Avertissement Légal
 
-**GameScraper est un outil technique neutre.** Il a été développé dans le but de faciliter la gestion de bibliothèques de jeux légaux (jeux freeware, open-source, jeux sans DRM, démos, ou projets étudiants sur des plateformes comme itch.io). 
-
-L'utilisateur est **seul responsable** des URL et des sources qu'il décide d'ajouter dans l'application. Le développeur n'encourage en aucun cas le téléchargement de contenus protégés par le droit d'auteur sans autorisation. Veuillez respecter les conditions d'utilisation des sites que vous scrapez.
+**GameScraper est un outil technique neutre.** Il est conçu pour la gestion de bibliothèques de jeux légaux (freewares, open-source, sans DRM). L'utilisateur est **seul responsable** des sources qu'il ajoute. Respectez toujours les droits d'auteur et les conditions d'utilisation des sites scrapés.
 
 ---
 
 ## ⚙️ Comment ça marche ?
 
 ### 1. La Bibliothèque
-Votre page d'accueil. Lancez vos jeux d'un simple clic, suivez vos heures de jeu et découvrez de nouveaux titres fraîchement récupérés depuis vos sources.
+Lancez vos jeux installés et suivez votre temps de jeu d'un simple coup d'œil.
 
 ### 2. Gestion des Sources
-C'est ici que la magie opère. Vous pouvez configurer l'outil pour qu'il aille chercher les données là où vous le souhaitez.
+Configurez vos sites sources pour importer des catalogues entiers.
 
 ![Interface Source](image2.png)
 
-* **Page Unique :** Idéal pour scraper une liste ou un tableau sur une page web précise.
-* **Multi-pages :** Conçu pour parcourir des catalogues entiers ou des systèmes de pagination.
-* **Actualisation & Cache :** Mettez à jour vos sources en un clic ou videz le cache pour forcer une nouvelle recherche.
+* **Page Unique :** Pour scraper une liste précise.
+* **Multi-pages :** Pour parcourir des sites entiers.
+* **Vider le cache :** Pour forcer une mise à jour des données.
 
 ---
 
-## 🚀 Installation & Démarrage rapide
+## 🚀 Installation Rapide
 
-L'installation de GameScraper est conçue pour être la plus simple possible :
-
-1. Descendez en bas de cette page (ou allez dans la section **Releases** de ce dépôt).
-2. Téléchargez le dernier fichier d'installation **`.exe`**.
-3. Double-cliquez sur le fichier téléchargé pour lancer l'installation.
-4. Ouvrez GameScraper, ajoutez votre première source, et profitez !
+1. Allez dans la section **Releases** de ce dépôt (en bas de page).
+2. Téléchargez le fichier **`.exe`**.
+3. Installez, lancez et ajoutez votre première source. **GameScraper s'occupe du reste !**
 
 ---
 
 ## 🛠️ Technologies Utilisées
 
-* **Frontend :** (ex: Electron, React, TailwindCSS...)
-* **Backend / Scraping :** (ex: Node.js, Python...)
-* **Base de données :** (ex: SQLite, JSON local...)
+* **Frontend :** Electron, React, TailwindCSS
+* **Backend :** Node.js
+* **Stack :** Vite, TypeScript
 
 ---
 
 ## 🤝 Contribution
 
-Les contributions sont les bienvenues ! Si vous souhaitez améliorer GameScraper, corriger un bug ou ajouter un nouveau type de sélecteur pour le scraper, n'hésitez pas à ouvrir une *Issue* ou à soumettre une *Pull Request*.
+N'hésitez pas à ouvrir une *Issue* ou une *Pull Request* pour améliorer l'outil !
 
 ## 📄 Licence
 
-Ce projet est sous licence [MIT/GPL/Autre] - voir le fichier `LICENSE` pour plus de détails.
+Ce projet est sous licence MIT.
