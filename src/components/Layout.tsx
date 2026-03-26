@@ -108,20 +108,21 @@ export function Layout({ children }: { children: ReactNode }) {
       <div className="app-bg" />
       
       <aside className="relative z-20 w-64 border-r border-white/10 bg-black/40 backdrop-blur-md flex flex-col">
-        <div className="p-6">
-          <NavLink to="/library" className="flex items-center gap-3 text-lg font-extrabold tracking-tight text-white">
+        <div className="p-2 flex flex-col items-center">
+          <NavLink to="/library" className="flex items-center justify-center -mt-4">
             {logoOk ? (
-              <img
-                src={logoUrl}
-                alt=""
-                className="h-10 w-10 select-none"
-                draggable={false}
-                onError={() => setLogoOk(false)}
-              />
+              <div className="h-28 w-28 flex items-center justify-center">
+                <img
+                  src={logoUrl}
+                  alt=""
+                  className="max-h-full max-w-full object-contain select-none"
+                  draggable={false}
+                  onError={() => setLogoOk(false)}
+                />
+              </div>
             ) : (
-              <div className="h-10 w-10 rounded bg-gradient-to-br from-steam-accent to-blue-500" />
+              <div className="h-28 w-28 rounded bg-gradient-to-br from-steam-accent to-blue-500" />
             )}
-            <span>GameScraper</span>
           </NavLink>
         </div>
 

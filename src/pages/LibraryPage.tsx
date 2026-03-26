@@ -175,9 +175,31 @@ export function LibraryPage() {
                     >
                       {installed ? 'Installé' : 'À télécharger'}
                     </span>
-                    {g.currentSessionStartedAt && (
-                      <span className="rounded bg-emerald-500/20 px-2 py-0.5 text-[11px] font-semibold text-emerald-200">
-                        En jeu • {formatPlayTime(runningExtra)}
+                    {g.currentSessionStartedAt ? (
+                      <>
+                        <span className="rounded bg-emerald-500/20 px-2 py-0.5 text-[11px] font-semibold text-emerald-200">
+                          En jeu • {formatPlayTime(runningExtra)}
+                        </span>
+                        <button
+                          onClick={async (e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            if (!confirm(`Fermer ${g.name} ?`)) return
+                            try {
+                              await window.launcher.gameUninstall(g.id)
+                              await refresh()
+                            } catch (err) {
+                              setError(err instanceof Error ? err.message : 'Erreur')
+                            }
+                          }}
+                          className="rounded bg-red-600 px-2 py-0.5 text-[11px] font-semibold text-white hover:bg-red-700 transition-all"
+                        >
+                          FERMER
+                        </button>
+                      </>
+                    ) : (
+                      <span className="text-xs font-semibold text-amber-200">
+                        Installé
                       </span>
                     )}
                   </div>

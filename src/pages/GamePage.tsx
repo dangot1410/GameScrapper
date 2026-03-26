@@ -167,6 +167,14 @@ export function GamePage() {
       const g = lib.games.find((x) => x.id === id)
       if (g) setLibraryGame(g)
     })()
+    
+    // Listen for library updates to refresh game status (e.g., when launching/closing)
+    const unsub = window.launcher.onLibraryUpdated((p) => {
+      const updatedGame = p.games.find((x) => x.id === id)
+      if (updatedGame) setLibraryGame(updatedGame)
+    })
+    
+    return () => unsub()
   }, [id])
 
   const detailPageUrl = libraryGame?.detailPageUrl ?? storeItem?.detailPageUrl ?? ''

@@ -2211,6 +2211,7 @@ ipcMain.handle('game:launch', async (_e, gameId: string) => {
   lib.games = lib.games.filter((x) => x.id !== gameId)
   lib.games.push(updated)
   saveLibrary(lib)
+  console.log(`Launching game ${gameId}, setting currentSessionStartedAt to ${startedIso}`)
   sendLibraryUpdated(lib)
 
   const child = spawn(updated.exePath, [], {
@@ -2494,6 +2495,7 @@ async function createWindow() {
       preload,
       contextIsolation: true,
       nodeIntegration: false,
+      devTools: true,
     },
   })
   mainWindow.setMenuBarVisibility(false)
