@@ -166,6 +166,24 @@ export function GamePage() {
       const lib = await window.launcher.libraryGet()
       const g = lib.games.find((x) => x.id === id)
       if (g) setLibraryGame(g)
+      
+      // Check for existing download state to show progress
+      try {
+        const downloadState = await window.launcher.gameDownloadState(id)
+        if (downloadState && downloadState.isActive && downloadState.phase === 'download') {
+          setBusy(true)
+          setInstallProgress({
+            phase: 'download',
+            received: downloadState.received,
+            total: downloadState.total,
+            message: 'Téléchargement en cours...',
+          })
+          // Resume listening to progress
+          void window.launcher.gameResumeDownload(id)
+        }
+      } catch {
+        // Ignore errors
+      }
     })()
     
     // Listen for library updates to refresh game status (e.g., when launching/closing)

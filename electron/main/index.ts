@@ -10,7 +10,7 @@ import {
   statSync,
   writeFileSync,
 } from 'node:fs'
-import { copyFile, writeFile, unlink } from 'node:fs/promises'
+import { copyFile, writeFile, unlink, readFile } from 'node:fs/promises'
 import { execFile, spawn, type ChildProcess } from 'node:child_process'
 import { promisify } from 'node:util'
 import { createHash } from 'node:crypto'
@@ -35,6 +35,76 @@ type CurrentInstallCancel = {
 }
 let currentInstallCancel: CurrentInstallCancel | null = null
 let installCancelRequested = false
+
+// Persistent download state for resume support
+type PersistentDownloadState = {
+  gameId: string
+  gameName: string
+  url: string
+  destPath: string
+  received: number
+  total: number
+  isActive: boolean
+  lastUpdated: string
+  phase: 'resolve' | 'download' | 'extract' | 'done' | 'error'
+  error?: string
+}
+
+const downloadStatePath = path.join(app.getPath('userData'), 'downloads.json')
+let persistentDownloads: Map<string, PersistentDownloadState> = new Map()
+
+async function loadPersistentDownloads() {
+  try {
+    const data = await readFile(downloadStatePath, 'utf-8')
+    const parsed = JSON.parse(data) as PersistentDownloadState[]
+    persistentDownloads = new Map(parsed.map(d => [d.gameId, d]))
+    // Mark all as inactive on startup
+    for (const d of persistentDownloads.values()) {
+      d.isActive = false
+    }
+  } catch {
+    persistentDownloads = new Map()
+  }
+}
+
+async function savePersistentDownloads() {
+  const data = Array.from(persistentDownloads.values())
+  await writeFile(downloadStatePath, JSON.stringify(data, null, 2))
+}
+
+function updateDownloadState(gameId: string, updates: Partial<PersistentDownloadState>) {
+  const existing = persistentDownloads.get(gameId)
+  if (existing) {
+    Object.assign(existing, updates, { lastUpdated: new Date().toISOString() })
+  } else {
+    persistentDownloads.set(gameId, {
+      gameId,
+      gameName: '',
+      url: '',
+      destPath: '',
+      received: 0,
+      total: 0,
+      isActive: false,
+      phase: 'resolve',
+      ...updates,
+      lastUpdated: new Date().toISOString(),
+    })
+  }
+  void savePersistentDownloads()
+}
+
+function sendPersistentDownloadsProgress() {
+  for (const download of persistentDownloads.values()) {
+    if (download.isActive && download.phase === 'download') {
+      sendInstallProgress({
+        phase: 'download',
+        received: download.received,
+        total: download.total,
+        message: path.basename(download.destPath),
+      })
+    }
+  }
+}
 
 type StoreProgressPayload =
   | { phase: 'fetch' }
@@ -1547,7 +1617,9 @@ async function downloadToFileWithProgress(
     etaSeconds?: number,
   ) => void,
   signal?: AbortSignal,
-) {
+  gameId?: string,
+  resumeFrom: number = 0,
+): Promise<void> {
   const refUrl = (() => {
     try {
       return new URL(url).href
@@ -1555,45 +1627,120 @@ async function downloadToFileWithProgress(
       return url
     }
   })()
+
+  // Try to resume if file exists
+  let startByte = resumeFrom
+  if (startByte === 0 && existsSync(dest)) {
+    const stats = statSync(dest)
+    startByte = stats.size
+  }
+
+  const headers: Record<string, string> = { ...FETCH_HEADERS, Referer: refUrl }
+  if (startByte > 0) {
+    headers['Range'] = `bytes=${startByte}-`
+  }
+
   const res = await fetch(url, {
-    headers: { ...FETCH_HEADERS, Referer: refUrl },
+    headers,
     redirect: 'follow',
     signal,
   })
-  if (!res.ok) throw new Error(`Téléchargement: HTTP ${res.status}`)
+
+  // If server doesn't support range, start from beginning
+  const isResuming = res.status === 206 && startByte > 0
+  if (!res.ok && res.status !== 206) throw new Error(`Téléchargement: HTTP ${res.status}`)
+
   mkdirSync(path.dirname(dest), { recursive: true })
-  const total = Number(res.headers.get('content-length') || 0)
+
+  const contentLength = Number(res.headers.get('content-length') || 0)
+  const total = isResuming ? startByte + contentLength : contentLength
+  let received = isResuming ? startByte : 0
+
   const body = res.body
   if (!body) throw new Error('Réponse vide')
+
   const reader = body.getReader()
-  const file = createWriteStream(dest)
-  let received = 0
+  const file = createWriteStream(dest, { flags: isResuming ? 'a' : 'w' })
   let lastTime = Date.now()
-  let lastReceived = 0
+  let lastReceived = received
   const throttleMs = 150
+  let retryCount = 0
+  const maxRetries = 5
+
   try {
     for (;;) {
       if (currentInstallCancel?.isPaused) {
         await new Promise(resolve => setTimeout(resolve, 500))
         continue
       }
-      const { done, value } = await reader.read()
-      if (done) break
-      if (value) {
-        received += value.length
-        file.write(Buffer.from(value))
-        const now = Date.now()
-        const elapsed = (now - lastTime) / 1000
-        let speedBytesPerSec: number | undefined
-        let etaSeconds: number | undefined
-        if (elapsed >= throttleMs / 1000 && total > 0) {
-          const delta = received - lastReceived
-          speedBytesPerSec = delta / elapsed
-          if (speedBytesPerSec > 0) etaSeconds = (total - received) / speedBytesPerSec
-          lastTime = now
-          lastReceived = received
+
+      try {
+        const { done, value } = await reader.read()
+        if (done) break
+        if (value) {
+          received += value.length
+          file.write(Buffer.from(value))
+
+          // Update persistent state
+          if (gameId) {
+            updateDownloadState(gameId, { received, total })
+          }
+
+          const now = Date.now()
+          const elapsed = (now - lastTime) / 1000
+          let speedBytesPerSec: number | undefined
+          let etaSeconds: number | undefined
+          if (elapsed >= throttleMs / 1000 && total > 0) {
+            const delta = received - lastReceived
+            speedBytesPerSec = delta / elapsed
+            if (speedBytesPerSec > 0) etaSeconds = (total - received) / speedBytesPerSec
+            lastTime = now
+            lastReceived = received
+          }
+          onProgress(received, total || received, speedBytesPerSec, etaSeconds)
+          retryCount = 0 // Reset retry count on success
         }
-        onProgress(received, total || received, speedBytesPerSec, etaSeconds)
+      } catch (err) {
+        if (signal?.aborted) throw err
+        retryCount++
+        if (retryCount > maxRetries) throw err
+
+        // Wait before retry with exponential backoff
+        await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, retryCount - 1)))
+
+        // Try to resume from current position
+        try {
+          file.end()
+          const stats = statSync(dest)
+          const newRes = await fetch(url, {
+            headers: { ...FETCH_HEADERS, Referer: refUrl, Range: `bytes=${stats.size}-` },
+            redirect: 'follow',
+            signal,
+          })
+          if (newRes.ok || newRes.status === 206) {
+            const newBody = newRes.body
+            if (newBody) {
+              const newReader = newBody.getReader()
+              // Continue with new reader
+              let resumed = false
+              while (!resumed) {
+                try {
+                  const { done, value } = await newReader.read()
+                  if (done) { resumed = true; break }
+                  if (value) {
+                    received += value.length
+                    file.write(Buffer.from(value))
+                    if (gameId) updateDownloadState(gameId, { received, total })
+                  }
+                } catch {
+                  break
+                }
+              }
+            }
+          }
+        } catch {
+          // Continue to next retry
+        }
       }
     }
   } finally {
@@ -2024,7 +2171,7 @@ ipcMain.handle(
     const libFirst = loadLibrary()
     const entry = libFirst.games.find((g) => g.id === payload.id)
     if (!entry) {
-      throw new Error('Ajoute d’abord le jeu à la bibliothèque')
+      throw new Error("Ajoute d'abord le jeu à la bibliothèque")
     }
     if (entry.exePath && existsSync(entry.exePath)) {
       return entry
@@ -2032,6 +2179,10 @@ ipcMain.handle(
 
     const installDir = entry.installDir
     mkdirSync(installDir, { recursive: true })
+
+    // Check for existing download state to resume
+    const existingState = persistentDownloads.get(payload.id)
+    const resumeFrom = existingState?.received || 0
 
     currentInstallCancel = {
       abortController: new AbortController(),
@@ -2043,6 +2194,16 @@ ipcMain.handle(
 
     let resolvedUrlForLibrary = payload.downloadUrl
     let localFilePath: string
+
+    // Initialize persistent download state
+    updateDownloadState(payload.id, {
+      gameId: payload.id,
+      gameName: payload.name,
+      url: payload.downloadUrl,
+      destPath: installDir,
+      isActive: true,
+      phase: 'resolve',
+    })
 
     try {
       const dl = new URL(payload.downloadUrl)
@@ -2069,6 +2230,7 @@ ipcMain.handle(
         if (lower.endsWith('.exe')) {
           const fileName = path.basename(new URL(resolvedUrl).pathname) || 'game.exe'
           const target = path.join(installDir, fileName)
+          updateDownloadState(payload.id, { destPath: target, phase: 'download' })
           await downloadToFileWithProgress(
             resolvedUrl,
             target,
@@ -2083,10 +2245,13 @@ ipcMain.handle(
               })
             },
             signal,
+            payload.id,
+            resumeFrom,
           )
           localFilePath = target
         } else if (lower.endsWith('.zip')) {
           const zipPath = path.join(installDir, 'download.zip')
+          updateDownloadState(payload.id, { destPath: zipPath, phase: 'download' })
           await downloadToFileWithProgress(
             resolvedUrl,
             zipPath,
@@ -2101,11 +2266,14 @@ ipcMain.handle(
               })
             },
             signal,
+            payload.id,
+            resumeFrom,
           )
           localFilePath = zipPath
         } else if (lower.endsWith('.rar') || lower.endsWith('.7z')) {
           const ext = lower.endsWith('.rar') ? '.rar' : '.7z'
           const archivePath = path.join(installDir, `download${ext}`)
+          updateDownloadState(payload.id, { destPath: archivePath, phase: 'download' })
           await downloadToFileWithProgress(
             resolvedUrl,
             archivePath,
@@ -2120,6 +2288,8 @@ ipcMain.handle(
               })
             },
             signal,
+            payload.id,
+            resumeFrom,
           )
           localFilePath = archivePath
         } else {
@@ -2130,6 +2300,7 @@ ipcMain.handle(
       }
 
       sendInstallProgress({ phase: 'extract', message: 'Extraction…' })
+      updateDownloadState(payload.id, { phase: 'extract' })
       const exePath = await processDownloadedFileToExe(localFilePath, installDir, payload.name)
 
       const game: LibraryGame = {
@@ -2147,11 +2318,22 @@ ipcMain.handle(
       lib.games.push(game)
       saveLibrary(lib)
       sendLibraryUpdated(lib)
+      
+      // Mark download as complete
+      updateDownloadState(payload.id, { phase: 'done', isActive: false })
+      // Clean up completed download after a delay
+      setTimeout(() => {
+        persistentDownloads.delete(payload.id)
+        void savePersistentDownloads()
+      }, 60000)
+      
       return game
     } catch (err) {
       if (err instanceof Error && (err.name === 'AbortError' || err.message === 'Téléchargement annulé')) {
+        updateDownloadState(payload.id, { isActive: false, phase: 'error', error: 'Annulé' })
         throw new Error('Téléchargement annulé')
       }
+      updateDownloadState(payload.id, { isActive: false, phase: 'error', error: err instanceof Error ? err.message : 'Erreur' })
       throw err
     } finally {
       currentInstallCancel = null
@@ -2172,6 +2354,33 @@ ipcMain.handle('game:installCancel', () => {
   } else {
     ref.abortController.abort()
   }
+})
+
+// Get persistent download state for a game
+ipcMain.handle('game:downloadState', (_e, gameId: string) => {
+  return persistentDownloads.get(gameId) || null
+})
+
+// Get all active downloads
+ipcMain.handle('game:activeDownloads', () => {
+  return Array.from(persistentDownloads.values()).filter(d => d.isActive)
+})
+
+// Resume a download (called when user revisits game page)
+ipcMain.handle('game:resumeDownload', async (_e, gameId: string) => {
+  const state = persistentDownloads.get(gameId)
+  if (!state || state.phase === 'done') return null
+  
+  // Re-send progress to renderer
+  if (state.phase === 'download') {
+    sendInstallProgress({
+      phase: 'download',
+      received: state.received,
+      total: state.total,
+      message: path.basename(state.destPath),
+    })
+  }
+  return state
 })
 
 ipcMain.handle('game:installPause', () => {
@@ -2513,7 +2722,14 @@ async function createWindow() {
   })
 }
 
-app.whenReady().then(createWindow)
+app.whenReady().then(async () => {
+  await loadPersistentDownloads()
+  await createWindow()
+  // Send any persisted download progress to renderer
+  setTimeout(() => {
+    sendPersistentDownloadsProgress()
+  }, 2000)
+})
 
 app.on('window-all-closed', () => {
   mainWindow = null

@@ -112,6 +112,36 @@ declare global {
       gameInstallCancel: () => Promise<void>
       gameInstallPause: () => Promise<boolean>
       gameInstallResume: () => Promise<boolean>
+      gameDownloadState: (gameId: string) => Promise<{
+        gameId: string
+        gameName: string
+        url: string
+        destPath: string
+        received: number
+        total: number
+        isActive: boolean
+        phase: string
+      } | null>
+      gameActiveDownloads: () => Promise<{
+        gameId: string
+        gameName: string
+        url: string
+        destPath: string
+        received: number
+        total: number
+        isActive: boolean
+        phase: string
+      }[]>
+      gameResumeDownload: (gameId: string) => Promise<{
+        gameId: string
+        gameName: string
+        url: string
+        destPath: string
+        received: number
+        total: number
+        isActive: boolean
+        phase: string
+      } | null>
       
       // Settings
       settingsGet: () => Promise<{ gamesFolderPath?: string | null; sources?: any[]; activeSourceId?: string | null }>

@@ -48,6 +48,9 @@ contextBridge.exposeInMainWorld('launcher', {
   gameInstallCancel: () => ipcRenderer.invoke('game:installCancel'),
   gameInstallPause: () => ipcRenderer.invoke('game:installPause'),
   gameInstallResume: () => ipcRenderer.invoke('game:installResume'),
+  gameDownloadState: (gameId: string) => ipcRenderer.invoke('game:downloadState', gameId),
+  gameActiveDownloads: () => ipcRenderer.invoke('game:activeDownloads'),
+  gameResumeDownload: (gameId: string) => ipcRenderer.invoke('game:resumeDownload', gameId),
   
   // Settings
   settingsGet: () => ipcRenderer.invoke('settings:get'),

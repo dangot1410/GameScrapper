@@ -103,6 +103,31 @@ export function Layout({ children }: { children: ReactNode }) {
     })
   }, [])
 
+  // Check for active downloads on mount (for persistence across page changes)
+  useEffect(() => {
+    const checkActiveDownloads = async () => {
+      try {
+        const activeDownloads = await window.launcher.gameActiveDownloads()
+        if (activeDownloads && activeDownloads.length > 0) {
+          // Show the most recent active download
+          const download = activeDownloads[0]
+          if (download.phase === 'download') {
+            const pct = Math.min(88, 10 + Math.round((download.received / download.total) * 78))
+            setInstallProgress({
+              percent: pct,
+              label: 'Téléchargement…',
+              received: download.received,
+              total: download.total,
+            })
+          }
+        }
+      } catch {
+        // Ignore errors
+      }
+    }
+    void checkActiveDownloads()
+  }, [])
+
   return (
     <div className="relative min-h-screen flex text-steam-fg">
       <div className="app-bg" />
