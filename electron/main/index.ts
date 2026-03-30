@@ -1879,68 +1879,68 @@ function downloadThroughHostedPageWindow(
       return { action: 'deny' }
     })
 
-    // Block navigation to external sites (ads/redirects)
-    bw.webContents.on('will-navigate', (e, url) => {
-      const currentUrl = bw.webContents.getURL()
-      const targetHost = new URL(url).hostname
-      const currentHost = currentUrl ? new URL(currentUrl).hostname : ''
+    // // Block navigation to external sites (ads/redirects)
+    // bw.webContents.on('will-navigate', (e, url) => {
+    //   const currentUrl = bw.webContents.getURL()
+    //   const targetHost = new URL(url).hostname
+    //   const currentHost = currentUrl ? new URL(currentUrl).hostname : ''
       
-      // Allow navigation within the same domain or to download-related pages
-      const isSameDomain = targetHost === currentHost
-      const isDownloadPage = /megadb|mediafire|mega\.nz|gofile|buzzheavier|1fichier/i.test(targetHost)
+    //   // Allow navigation within the same domain or to download-related pages
+    //   const isSameDomain = targetHost === currentHost
+    //   const isDownloadPage = /megadb|mediafire|mega\.nz|gofile|buzzheavier|1fichier/i.test(targetHost)
       
-      if (!isSameDomain && !isDownloadPage) {
-        e.preventDefault()
-        console.log('Blocked navigation to:', url)
-      }
-    })
+    //   if (!isSameDomain && !isDownloadPage) {
+    //     e.preventDefault()
+    //     console.log('Blocked navigation to:', url)
+    //   }
+    // })
 
-    // Block new window requests from the page
-    sess.webRequest.onBeforeRequest({ urls: ['*://*/*'] }, (details, callback) => {
-      // Block known ad/tracking domains
-      const blockedDomains = [
-        'doubleclick.net',
-        'googleadservices.com',
-        'googlesyndication.com',
-        'facebook.com/tr',
-        'adsystem',
-        'amazon-adsystem',
-        'adnxs.com',
-        'advertising.com',
-        'outbrain.com',
-        'taboola.com',
-        'popads.net',
-        'popcash.net',
-        'propellerads.com',
-        'onclickads.net',
-        'adsterra.com',
-        'ad-maven.com',
-        'hilltopads.net',
-        'adbuff.com',
-        'revenuehits.com',
-        'adversal.com',
-        'bidvertiser.com',
-        'clicksor.com',
-        'infolinks.com',
-        'kontera.com',
-        'linkbucks.com',
-        'shorte.st',
-        'adf.ly',
-        'bit.ly',
-        'tinyurl.com',
-        'ow.ly',
-        'short.link',
-      ]
+    // // Block new window requests from the page
+    // sess.webRequest.onBeforeRequest({ urls: ['*://*/*'] }, (details, callback) => {
+    //   // Block known ad/tracking domains
+    //   const blockedDomains = [
+    //     'doubleclick.net',
+    //     'googleadservices.com',
+    //     'googlesyndication.com',
+    //     'facebook.com/tr',
+    //     'adsystem',
+    //     'amazon-adsystem',
+    //     'adnxs.com',
+    //     'advertising.com',
+    //     'outbrain.com',
+    //     'taboola.com',
+    //     'popads.net',
+    //     'popcash.net',
+    //     'propellerads.com',
+    //     'onclickads.net',
+    //     'adsterra.com',
+    //     'ad-maven.com',
+    //     'hilltopads.net',
+    //     'adbuff.com',
+    //     'revenuehits.com',
+    //     'adversal.com',
+    //     'bidvertiser.com',
+    //     'clicksor.com',
+    //     'infolinks.com',
+    //     'kontera.com',
+    //     'linkbucks.com',
+    //     'shorte.st',
+    //     'adf.ly',
+    //     'bit.ly',
+    //     'tinyurl.com',
+    //     'ow.ly',
+    //     'short.link',
+    //   ]
       
-      const url = details.url.toLowerCase()
-      const isBlocked = blockedDomains.some(domain => url.includes(domain))
+    //   const url = details.url.toLowerCase()
+    //   const isBlocked = blockedDomains.some(domain => url.includes(domain))
       
-      if (isBlocked) {
-        callback({ cancel: true })
-      } else {
-        callback({ cancel: false })
-      }
-    })
+    //   if (isBlocked) {
+    //     callback({ cancel: true })
+    //   } else {
+    //     callback({ cancel: false })
+    //   }
+    // })
 
     const clearAutoClick = () => {
       if (autoClickInterval) {
